@@ -15,7 +15,7 @@ event = threading.Event()
 @client.set_process_callback
 def process(frames):
     assert frames == client.blocksize
-    for i, o in zip(client.inports, client.outports):
+    for i, _o in zip(client.inports, client.outports):
         print(np.average(i.get_array()))
         # o.get_buffer()[:] = i.get_buffer()
 

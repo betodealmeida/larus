@@ -8,14 +8,23 @@ individual levels can be controlled from there.
 
 """
 
+import numpy as np
+
+import jack
+
+from launchpad import BUTTON
+
 
 class Mixer:
 
-    def __init__(self, client):
+    select = BUTTON(5)
+
+    def __init__(self, client: jack.Client) -> None:
         self.client = client
         self.register_ports()
+        self.buffer = np.zeros((8, 8), 'f')
 
-    def register_ports(self):
+    def register_ports(self) -> None:
         """
         Register 8 input tracks and 2 output tracks.
 
@@ -33,5 +42,5 @@ class Mixer:
             for channel in (1, 2)
         ]
 
-    def process(self, frames):
+    def process(self, frames) -> None:
         pass
