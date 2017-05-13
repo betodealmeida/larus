@@ -1,21 +1,21 @@
 class Callbacks:
 
-    callbacks = {}
+    def __init__(self):
+        self.callbacks = {}
 
-    @classmethod
-    def add_process(cls, condition):
+    def add_process(self, condition):
         def decorator(func):
-            cls.callbacks[condition] = func
+            self.callbacks[condition] = func
             return func
         return decorator
 
 
 class A:
 
-    callbacks = {}
+    callbacks = Callbacks()
 
     def process(self, value):
-        for condition, func in self.callbacks.items():
+        for condition, func in self.callbacks.callbacks.items():
             if condition(value):
                 func(self, value)
 
