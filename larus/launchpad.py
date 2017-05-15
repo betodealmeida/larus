@@ -1,7 +1,16 @@
 from enum import Enum
 
 
-class Button:
+class Event:
+    """
+    An event from the launchpad.
+
+    """
+    def __call__(self, indata):
+        raise NotImplementedError('Subclasses must implement __call__')
+
+
+class Button(Event):
 
     """
     Class used to describe a button in the Launchpad Mini.
@@ -9,6 +18,7 @@ class Button:
     A button in the top row:
 
         >>> Button(5)
+        >>> Button('6')
 
     A button in the right column:
 
@@ -16,28 +26,33 @@ class Button:
 
     A button in the grid:
 
-        >>> Button(1, 8)
-
-    A combination of buttons:
-
-        >>> button = Button('H') + Button(1)
+        >>> Button('1A')
 
     """
 
-    def __init__(self, *values):
-        pass
+    def __init__(self, code):
+        self.x = 
+        seld.y = 
+
+    def __call__(self):
+        return self
+
+    def __add__(self, other):
+        return ButtonCombination()
 
 
-class Row:
+class Buttons(Event):
+    def __init__(self, buttons):
+        self.buttons = buttons
+
+
+class ButtonCombination(Event):
     pass
 
 
-class Column:
-    pass
-
-
-class Grid:
-    pass
+Grid = Buttons([Button(f'{i}{c}') for i in range(1, 9) for c in 'ABCDEFGH'])
+Column = Buttons([Button(c) for c in 'ABCDEFGH'])
+Grid = Button([Button(i) for i in range(1, 9)])
 
 
 class Color(Enum):

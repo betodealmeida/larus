@@ -4,7 +4,8 @@
 # Larus mixer #
 
 This is a 8-track mixer that displays levels in the Launchpad Mini, and whose
-individual levels can be controlled from there.
+individual levels can be controlled from the grid. The mixer mode is selected
+by pressing button 5 in the tow row of the Launchpad Mini.
 
 """
 
@@ -12,8 +13,8 @@ import numpy as np
 
 import jack
 
-from core import Mode
-from launchpad import Button, Color, Grid
+from launchpad import Button, Color, Column, Grid
+from modes import Mode
 
 
 # create an array of colors where the bottom is LOW_GREEN and the top is
@@ -28,14 +29,18 @@ class Mixer(Mode):
     select = Button(5)
 
     def __init__(self, client: jack.Client) -> None:
-        self.client = client
-        self.register_ports()
+        super().__init__(client)
 
         # the level of each of the 8 tracks; start at 66%
         self.levels = np.ones(8, np.float64) * 0.66
 
-        # buffer representing data in the Launchpad Mini
-        self.buffer = np.zeros((8, 8), np.float64)
+        # muted state
+        self.muted = np.zeros(8, np.bool)
+
+        # arrays representing data in the Launchpad Mini buttons
+        self.grid = np.zeros((8, 8), np.float64)
+        self.row = np.zeros(8, np.float64)
+        self.column = np.zeros(8, np.float64)
 
     def register_ports(self) -> None:
         """
@@ -61,7 +66,7 @@ class Mixer(Mode):
         Mix incoming audio and update buffer.
 
         """
-        adjusted = in_ * self.levels
+        adjusted = in_ * self.levels * ~self.muted
         out[:, 0] = np.average(adjusted[:, 0::2], 1)
         out[:, 1] = np.average(adjusted[:, 1::2], 1)
 
@@ -76,8 +81,12 @@ class Mixer(Mode):
         Adjust the level for a track when a button is pressed in the grid.
 
         """
-        level = np.linspace(0, 1, 8)[button.y - 1]
-        self.levels[button.x - 1] = level
+        if button.y == 1:
+            # toggle mute
+            self.muted[button.x - 1] = ~self.muted[button.x - 1]
+        else:
+            level = np.linspace(0, 1, 8)[button.y - 1]
+            self.levels[button.x - 1] = level
 
     @Mode.process_midi(Column)
     def adjust_levels(self, button):
@@ -85,5 +94,9 @@ class Mixer(Mode):
         Adjust levels for all tracks.
 
         """
-        level = np.linspace(0, 1, 8)[button.y - 1]
-        self.levels[:] = level
+        if button.y == 1:
+            # toggle mute
+            self.muted = ~self.muted
+        else:
+            level = np.linspace(0, 1, 8)[button.y - 1]
+            self.levels[:] = level
