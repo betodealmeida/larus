@@ -17,7 +17,10 @@ class Mode:
 
     def process(self, frames):
         """
-        Method called by the client for each event.
+        Method called by the Jack client for each event.
+
+        This meethod dispatch audio/MIDI to all the registered callbacks.
+        Audio is passed 
 
         """
         class_name = self.__class__.__name__
@@ -35,7 +38,7 @@ class Mode:
                 port.get_array()[:] = out[:, i]
 
         for condition, func in self.midi_callbacks[class_name].items():
-            for offset, indata in inport.incoming_midi_events():
+            for _offset, indata in inport.incoming_midi_events():
                 if condition(indata):
                     button = get_button(indata)
                     func(button)

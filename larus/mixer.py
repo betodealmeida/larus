@@ -63,14 +63,14 @@ class Mixer(Mode):
     @Mode.process_audio
     def mix_audio(self, in_, out) -> None:
         """
-        Mix incoming audio and update buffer.
+        Mix incoming audio.
 
         """
         adjusted = in_ * self.levels * ~self.muted
         out[:, 0] = np.average(adjusted[:, 0::2], 1)
         out[:, 1] = np.average(adjusted[:, 1::2], 1)
 
-        # TODO: dB = 20 * log10(amplitude)
+        # TODO: should we use the log of amplitude instead?
         amplitude = np.average(out, 0)
         self.buffer = meter[:]
         self.buffer[amplitude < meter] = 0
@@ -79,6 +79,8 @@ class Mixer(Mode):
     def adjust_level(self, button):
         """
         Adjust the level for a track when a button is pressed in the grid.
+
+        If the bottom button is pressed we toggle the mute state for the track.
 
         """
         if button.y == 1:
@@ -92,6 +94,8 @@ class Mixer(Mode):
     def adjust_levels(self, button):
         """
         Adjust levels for all tracks.
+
+        The bottom button (H) toggles the mute state of all tracks.
 
         """
         if button.y == 1:
