@@ -68,16 +68,16 @@ class Button(Event):
         """
         Return the pitch expected for this button.
 
-        When one of these buttons from the grid or from the colum nis pressed
+        When one of the buttons from the grid or from the column is pressed
         the Launchpad will send on note on and note off:
 
-            144 0-120 127  # note on
-            128 0-120 64   # note off
+            144 0-120 127    # note on
+            128 0-120  64    # note off
 
         When the top row is pressed the Launchpad sends a CC:
 
-            176 104-111 127
-            176 104-111 0
+            176 104-111 127  # note on
+            176 104-111   0  # note off
 
         """
         if self.y == 8:
@@ -88,10 +88,10 @@ class Button(Event):
     def match(self, indata) -> bool:
         if len(indata) == 3:
             status, pitch, vel = struct.unpack('3B', indata)
-            if status == 144:
-                return pitch == self.pitch
-            elif status == 176:
-                return pitch == self.pitch
+            if self.y == 8 and status == 176 and pitch == self.pitch:
+                return True
+            elif self.y < 8 and status == 144 and pitch == self.pitch:
+                return True
 
         return False
 
