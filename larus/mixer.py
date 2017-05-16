@@ -1,11 +1,14 @@
 # -*- coding: utf-8 -*-
 
 """
-# Larus mixer #
+Larus mixer
 
 This is a 8-track mixer that displays levels in the Launchpad Mini, and whose
-individual levels can be controlled from the grid. The mixer mode is selected
-by pressing button 5 in the tow row of the Launchpad Mini.
+individual levels can be controlled from the grid. It also allows toggling the
+mute state of individual tracks or all of them.
+
+The mixer mode is selected by pressing button 5 in the top row of the Launchpad
+Mini.
 
 """
 
@@ -26,7 +29,7 @@ meter = np.ones((8, 8), np.float64) * palette.reshape(8, 1)
 class Mixer(Mode):
 
     # the mixer mode is activated by pressing button #5 in the top row
-    select = Button(5)
+    select: Button = Button('5')
 
     def __init__(self, client: jack.Client) -> None:
         super().__init__(client)
@@ -70,10 +73,9 @@ class Mixer(Mode):
         out[:, 0] = np.average(adjusted[:, 0::2], 1)
         out[:, 1] = np.average(adjusted[:, 1::2], 1)
 
-        # TODO: should we use the log of amplitude instead?
         amplitude = np.average(out, 0)
-        self.buffer = meter[:]
-        self.buffer[amplitude < meter] = 0
+        self.grid = meter[:]
+        self.grid[amplitude < meter] = 0
 
     @Mode.process_midi(Grid)
     def adjust_level(self, button):
@@ -83,12 +85,12 @@ class Mixer(Mode):
         If the bottom button is pressed we toggle the mute state for the track.
 
         """
-        if button.y == 1:
+        if button.y == 0:
             # toggle mute
-            self.muted[button.x - 1] = ~self.muted[button.x - 1]
+            self.muted[button.x] = ~self.muted[button.x]
         else:
-            level = np.linspace(0, 1, 8)[button.y - 1]
-            self.levels[button.x - 1] = level
+            level = np.linspace(0, 1, 8)[button.y]
+            self.levels[button.x] = level
 
     @Mode.process_midi(Column)
     def adjust_levels(self, button):
@@ -98,9 +100,9 @@ class Mixer(Mode):
         The bottom button (H) toggles the mute state of all tracks.
 
         """
-        if button.y == 1:
+        if button.y == 0:
             # toggle mute
             self.muted = ~self.muted
         else:
-            level = np.linspace(0, 1, 8)[button.y - 1]
+            level = np.linspace(0, 1, 8)[button.y]
             self.levels[:] = level

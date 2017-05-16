@@ -11,6 +11,7 @@ class Mode:
     def __init__(self, client):
         self.client = client
         self.register_ports()
+        self.controller_inport = None  # XXX
 
     def register_ports(self):
         raise NotImplementedError('Subclasses must implement register_ports')
@@ -20,7 +21,6 @@ class Mode:
         Method called by the Jack client for each event.
 
         This meethod dispatch audio/MIDI to all the registered callbacks.
-        Audio is passed 
 
         """
         class_name = self.__class__.__name__
@@ -38,9 +38,9 @@ class Mode:
                 port.get_array()[:] = out[:, i]
 
         for condition, func in self.midi_callbacks[class_name].items():
-            for _offset, indata in inport.incoming_midi_events():
-                if condition(indata):
-                    button = get_button(indata)
+            for _offset, indata in self.controller_inport.incoming_midi_events():
+                if condition.match(indata):
+                    button = condition.get_event(indata)
                     func(button)
 
     @classmethod
