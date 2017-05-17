@@ -61,7 +61,9 @@ class Button(Event):
             # y is 0 at the bottom, H
             self.y = 'HGFEDCBA'.index(groups[1])
 
-        # compute the pitch expected from this button
+        # compute the pitch expected from this button; note that button '1' and
+        # button "G" both have pitch 104, but the former sends a CC message,
+        # while the latter sends note on/off messages
         self.pitch: int = self.get_pitch()
 
     def get_pitch(self) -> int:
