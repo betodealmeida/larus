@@ -3,8 +3,8 @@ Temporary module for testing drawing on the Launchpad.
 
 """
 
+from collections import deque
 from enum import Enum
-import queue
 import time
 
 import jack
@@ -32,18 +32,18 @@ def rapid_led_update(q, grid, row, column):
     """
     # grid
     for v1, v2 in grid.reshape(-1, 2):
-        q.put((RAPID_LED_UPDATE, v1, v2))
+        q.appendleft((RAPID_LED_UPDATE, v1, v2))
 
     # column, from A to H
     for v1, v2 in column.reshape(-1, 2):
-        q.put((RAPID_LED_UPDATE, v1, v2))
+        q.appendleft((RAPID_LED_UPDATE, v1, v2))
 
     # row, from 1 to 8
     for v1, v2 in row.reshape(-1, 2):
-        q.put((RAPID_LED_UPDATE, v1, v2))
+        q.appendleft((RAPID_LED_UPDATE, v1, v2))
 
     # exit rapid LED update mode by resending a value with regular status
-    q.put((SET_GRID_LED, 0x70, grid[0, 0]))
+    q.appendleft((SET_GRID_LED, 0x70, grid[0, 0]))
 
 
 def draw_array(q, arr):
@@ -70,7 +70,7 @@ def draw_array(q, arr):
 
 client = jack.Client('Larus')
 outport = client.midi_outports.register('output')
-q = q = queue.Queue()
+q = deque(maxlen=100)
 
 
 @client.set_process_callback
@@ -78,8 +78,9 @@ def process(frames):
     outport.clear_buffer()
 
     offset = 0
-    while not q.empty():
-        event = q.get()
+    print(len(q))
+    while q:
+        event = q.pop()
         outport.write_midi_event(offset, event)
         offset += 1
 
@@ -90,7 +91,7 @@ def main():
         outport, 'a2j:Launchpad Mini [20] (playback): Launchpad Mini MIDI 1')
 
     # reset
-    q.put((0xb0, 0, 0))
+    q.appendleft((0xb0, 0, 0))
 
     t = 0
     while True:
