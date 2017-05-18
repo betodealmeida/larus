@@ -14,25 +14,25 @@ Mini.
 
 import numpy as np
 
-import jack
-
-from launchpad import Button, Color, Column, Grid
-from modes import Mode
+from draw import rapid_led_update
 
 
 # create an array of colors where the bottom is LOW_GREEN and the top is
 # FULL_RED, in order to display the levels of each track
-palette = np.linspace(Color.LOW_GREEN, Color.FULL_RED, 8)
+palette = np.linspace(0, 1, 9)[1:]
 meter = np.ones((8, 8), np.float64) * palette.reshape(8, 1)
 
 
-class Mixer(Mode):
+class Mixer:
 
     # the mixer mode is activated by pressing button #5 in the top row
-    select: Button = Button('5')
+    # select: Button = Button('5')
 
-    def __init__(self, client: jack.Client) -> None:
-        super().__init__(client)
+    def __init__(self, client, controller_queue):
+        self.client = client
+        self.controller_queue = controller_queue
+
+        self.active = False
 
         # the level of each of the 8 tracks; start at 66%
         self.levels = np.ones(8, np.float64) * 0.66
@@ -45,7 +45,7 @@ class Mixer(Mode):
         self.row = np.zeros(8, np.float64)
         self.column = np.zeros(8, np.float64)
 
-    def register_ports(self) -> None:
+    def register_ports(self):
         """
         Register 8 input tracks and 2 output tracks.
 
@@ -63,21 +63,25 @@ class Mixer(Mode):
             for channel in (1, 2)
         ]
 
-    @Mode.process_audio
-    def mix_audio(self, in_, out) -> None:
+    def process_audio(self, in_):
         """
         Mix incoming audio.
 
         """
         adjusted = in_ * self.levels * ~self.muted
+
+        out = np.zeros((in_.shape[0], 2), np.float64)
         out[:, 0] = np.average(adjusted[:, 0::2], 1)
         out[:, 1] = np.average(adjusted[:, 1::2], 1)
 
         amplitude = np.average(out, 0)
         self.grid = meter[:]
         self.grid[amplitude < meter] = 0
+        rapid_led_update(
+            self.controller_queue, self.grid, self.row, self.column)
 
-    @Mode.process_midi(Grid)
+        return out
+
     def adjust_level(self, button):
         """
         Adjust the level for a track when a button is pressed in the grid.
@@ -92,7 +96,6 @@ class Mixer(Mode):
             level = np.linspace(0, 1, 8)[button.y]
             self.levels[button.x] = level
 
-    @Mode.process_midi(Column)
     def adjust_levels(self, button):
         """
         Adjust levels for all tracks.
