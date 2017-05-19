@@ -24,48 +24,46 @@ class Color(Enum):
     LOW_GREEN = 28
     FULL_GREEN = 60
 
+    def to_double(self):
+        idx = palette.index(self)
+        return np.linspace(0, 1, 9)[1:][idx]
 
-def rapid_led_update(q, grid, row, column):
+
+palette = [
+    Color.LOW_GREEN,
+    Color.FULL_GREEN,
+    Color.FULL_YELLOW,
+    Color.LOW_AMBER,
+    Color.FULL_AMBER,
+    Color.LOW_RED,
+    Color.FULL_RED,
+]
+
+
+def rapid_led_update(deque, arr):
     """
     Address all 80 LEDs with 40 consecutive instructions.
 
+    The array `arr` should be an (10, 8) array of colors as integers.
+
     """
-    # grid
-    for v1, v2 in grid.reshape(-1, 2):
-        q.appendleft((RAPID_LED_UPDATE, v1, v2))
-
-    # column, from A to H
-    for v1, v2 in column.reshape(-1, 2):
-        q.appendleft((RAPID_LED_UPDATE, v1, v2))
-
-    # row, from 1 to 8
-    for v1, v2 in row.reshape(-1, 2):
-        q.appendleft((RAPID_LED_UPDATE, v1, v2))
+    for v1, v2 in arr.reshape(-1, 2):
+        deque.appendleft((0, (RAPID_LED_UPDATE, v1, v2)))
 
     # exit rapid LED update mode by resending a value with regular status
-    q.appendleft((SET_GRID_LED, 0x70, grid[0, 0]))
+    deque.appendleft((0, (SET_GRID_LED, 0x0, arr[0, 0])))
 
 
-def draw_array(q, arr):
-    row = np.ones(8, np.int32) * Color.OFF.value
-    column = np.ones(8, np.int32) * Color.OFF.value
-    grid = np.ones((8, 8), np.int32) * Color.OFF.value
+def convert_to_color_array(grid, row, column):
+    in_ = np.vstack([grid, column, row])
+    out = np.ones((10, 8), np.int32) * Color.OFF.value
 
     # convert from 0-1 to color
-    palette = [
-        Color.LOW_GREEN,
-        Color.FULL_GREEN,
-        Color.FULL_YELLOW,
-        Color.LOW_AMBER,
-        Color.FULL_AMBER,
-        Color.LOW_RED,
-        Color.FULL_RED,
-    ]
     thresholds = np.linspace(0, 1, 9)
     for threshold, color in zip(thresholds, palette):
-        grid[arr > threshold] = color.value
+        out[in_ > threshold] = color.value
 
-    rapid_led_update(q, grid, row, column)
+    return out
 
 
 client = jack.Client('Larus')
@@ -91,7 +89,7 @@ def main():
         outport, 'a2j:Launchpad Mini [20] (playback): Launchpad Mini MIDI 1')
 
     # reset
-    q.appendleft((0xb0, 0, 0))
+    q.appendleft((0, (0xb0, 0, 0)))
 
     t = 0
     while True:

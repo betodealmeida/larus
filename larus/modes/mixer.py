@@ -7,43 +7,47 @@ This is a 8-track mixer that displays levels in the Launchpad Mini, and whose
 individual levels can be controlled from the grid. It also allows toggling the
 mute state of individual tracks or all of them.
 
-The mixer mode is selected by pressing button 5 in the top row of the Launchpad
+The mixer mode is selected by pressing pad 5 in the top row of the Launchpad
 Mini.
 
 """
 
 import numpy as np
 
-from draw import rapid_led_update
+from draw import Color, convert_to_color_array, rapid_led_update
+from events import Column, Grid, Press, process_event
 
 
 # create an array of colors where the bottom is LOW_GREEN and the top is
 # FULL_RED, in order to display the levels of each track
-palette = np.linspace(0, 1, 9)[1:]
+palette = np.linspace(1, 0, 9)[:-1]
 meter = np.ones((8, 8), np.float64) * palette.reshape(8, 1)
 
 
 class Mixer:
 
-    # the mixer mode is activated by pressing button #5 in the top row
+    # the mixer mode is activated by pressing pad #5 in the top row
     # select: Button = Button('5')
 
-    def __init__(self, client, controller_queue):
+    def __init__(self, client, controlle_deque):
         self.client = client
-        self.controller_queue = controller_queue
+        self.controlle_deque = controlle_deque
+
+        self.register_ports()
 
         self.active = False
 
-        # the level of each of the 8 tracks; start at 66%
-        self.levels = np.ones(8, np.float64) * 0.66
+        # the level of each of the 8 tracks
+        self.levels = np.ones(8, np.float64)
 
         # muted state
         self.muted = np.zeros(8, np.bool)
 
-        # arrays representing data in the Launchpad Mini buttons
+        # arrays representing data in the Launchpad Mini pads
         self.grid = np.zeros((8, 8), np.float64)
-        self.row = np.zeros(8, np.float64)
         self.column = np.zeros(8, np.float64)
+        self.row = np.zeros(8, np.float64)
+        self.row[4] = Color.FULL_GREEN.to_double()
 
     def register_ports(self):
         """
@@ -71,41 +75,51 @@ class Mixer:
         adjusted = in_ * self.levels * ~self.muted
 
         out = np.zeros((in_.shape[0], 2), np.float64)
-        out[:, 0] = np.average(adjusted[:, 0::2], 1)
-        out[:, 1] = np.average(adjusted[:, 1::2], 1)
+        out[:, 0] = np.sum(adjusted[:, 0::2], 1)
+        out[:, 1] = np.sum(adjusted[:, 1::2], 1)
 
-        amplitude = np.average(out, 0)
-        self.grid = meter[:]
-        self.grid[amplitude < meter] = 0
-        rapid_led_update(
-            self.controller_queue, self.grid, self.row, self.column)
+        self.active = True  # XXX remove
+        if not self.active:
+            return
+
+        amplitude = np.sqrt(2) * np.average(np.abs(adjusted), 0)
+        power = np.log10(amplitude * 9 + 1)
+        self.grid[:] = meter
+        self.grid[power < meter] = 0
+        self.column[:] = meter[:, 0]
+        self.column[np.average(power, 0) < meter[:, 0]] = 0
+        self.grid[7, :][self.muted] = Color.FULL_RED.to_double()
+        arr = convert_to_color_array(self.grid, self.row, self.column)
+        rapid_led_update(self.controlle_deque, arr)
 
         return out
 
-    def adjust_level(self, button):
+    @process_event(Press(Grid))
+    def adjust_level(self, pad):
         """
-        Adjust the level for a track when a button is pressed in the grid.
+        Adjust the level for a track when a pad is pressed in the grid.
 
-        If the bottom button is pressed we toggle the mute state for the track.
+        If the bottom pad is pressed we toggle the mute state for the track.
 
         """
-        if button.y == 0:
+        if pad.y == 0:
             # toggle mute
-            self.muted[button.x] = ~self.muted[button.x]
+            self.muted[pad.x] = ~self.muted[pad.x]
         else:
-            level = np.linspace(0, 1, 8)[button.y]
-            self.levels[button.x] = level
+            level = np.linspace(0, 1, 8)[pad.y]
+            self.levels[pad.x] = level
 
-    def adjust_levels(self, button):
+    @process_event(Press(Column))
+    def adjust_levels(self, pad):
         """
         Adjust levels for all tracks.
 
-        The bottom button (H) toggles the mute state of all tracks.
+        The bottom pad (H) toggles the mute state of all tracks.
 
         """
-        if button.y == 0:
+        if pad.y == 0:
             # toggle mute
             self.muted = ~self.muted
         else:
-            level = np.linspace(0, 1, 8)[button.y]
+            level = np.linspace(0, 1, 8)[pad.y]
             self.levels[:] = level

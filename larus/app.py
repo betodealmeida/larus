@@ -1,12 +1,14 @@
 # -*- coding: utf-8 -*-
 
 from collections import deque
+import struct
 import threading
 
 import jack
 import numpy as np
 
 from config import CLIENT_NAME, MAX_NUMBER_OF_EVENTS
+from events import EventManager
 from modes.mixer import Mixer
 
 
@@ -19,11 +21,11 @@ class App:
         self.event = threading.Event()
 
         # create a deque to store MIDI data that updates the controller
-        self.controller_queue = deque(maxlen=MAX_NUMBER_OF_EVENTS)
+        self.controlle_deque = deque(maxlen=MAX_NUMBER_OF_EVENTS)
 
         # initialize all modes
         self.modes = [
-            Mixer(client, self.controller_queue),
+            Mixer(client, self.controlle_deque),
         ]
 
         # register MIDI ports to talk to the controller
@@ -32,10 +34,13 @@ class App:
 
     def process(self, frames):
         # read from controller
-        for offset, midi_event in self.from_controller.incoming_midi_events():
-            # TODO: check if we need to activate any modes and pass relevant
-            # events to them
-            print(offset, midi_event)
+        for _offset, midi_event in self.from_controller.incoming_midi_events():
+            midi_event = struct.unpack('3B', midi_event)
+            for mode in self.modes:
+                # activate? XXX
+                # process event?
+                if mode.active:
+                    self.process_callbacks(mode, midi_event)
 
         # process audio
         for mode in self.modes:
@@ -48,9 +53,15 @@ class App:
 
         # send data to the controller
         self.to_controller.clear_buffer()
-        while self.controller_queue:
-            midi_event = self.controller_queue.pop()
-            self.to_controller.write_midi_event(midi_event)
+        while self.controlle_deque:
+            offset, midi_event = self.controlle_deque.pop()
+            self.to_controller.write_midi_event(offset, midi_event)
+
+    def process_callbacks(self, mode, midi_event):
+        class_name = mode.__class__.__name__
+        for event, callback in EventManager.callbacks[class_name].items():
+            if event.match(midi_event):
+                callback(mode, event.trigger)
 
     def shutdown(self, status, reason):
         print('JACK shutdown!')
@@ -60,19 +71,22 @@ class App:
 
 
 def main():
-    client = jack.client(CLIENT_NAME)
+    client = jack.Client(CLIENT_NAME)
     app = App(client)
 
     client.set_process_callback(app.process)
     client.set_shutdown_callback(app.shutdown)
-
     client.activate()
 
     # connect app to controller
-    controller_input = client.get_ports('.*Launchpad Mini.*\(playback\).*')
-    controller_output = client.get_ports('.*Launchpad Mini.*\(capture\).*')
-    client.connect(app.to_controller, controller_input)
-    client.connect(app.from_controller, controller_output)
+    client.connect(
+        app.to_controller,
+        'a2j:Launchpad Mini [20] (playback): Launchpad Mini MIDI 1',
+    )
+    client.connect(
+        'a2j:Launchpad Mini [20] (capture): Launchpad Mini MIDI 1',
+        app.from_controller,
+    )
 
     with client:
         print('Press Ctrl+C to stop')
